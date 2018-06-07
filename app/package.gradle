@@ -1,0 +1,15 @@
+apply plugin: 'packer'
+packer {
+    // 多渠道批量打包脚本处理（mac）   ./gradlew clean apkRelease  打包命令
+    // 单一渠道批量打包脚本处理(window) gradle clean apkRelease
+    // 多渠道批量打包脚本处理(window) gradle clean apkRelease -Pchannels=@markets.txt
+    archiveNameFormat = '${buildType}-v${versionName}-${channel}'
+    archiveOutput = new File(project.rootProject.buildDir, "apks")
+    channelList = ['xiaomi','meizu']
+    channelFile = new File(project.rootDir, "markets.txt")
+//    channelMap = [
+//            "Cat" : project.rootProject.file("channels/cat.txt"),
+//            "Dog" : project.rootProject.file("channels/dog.txt"),
+//            "Fish": project.rootProject.file("channels/channels.txt")
+//    ]
+}

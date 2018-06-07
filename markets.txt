@@ -1,0 +1,7 @@
+xiaomi      #xioami
+meizu       #meizu
+tencnet     #tencent
+huawei      #huawei
+oppo        #oppo
+vivo        #vivo
+ali         #ali

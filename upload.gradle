@@ -1,0 +1,33 @@
+ext {
+    def channel = rootProject.ext.channel
+    def buildstyle  = rootProject.ext.buildstyle
+    def android_cfg   = rootProject.ext.android
+    upUrl = "http://api.fir.im/apps"
+    appName = "androidstduy"
+    bundleId = android_cfg.applicationId
+    verName = android_cfg.versionName
+    apiToken = "e8f8a14e9cfd279e27f6b8f81b50163b"
+    iconPath = project.rootDir.absolutePath+"/app/src/main/res/mipmap-xxhdpi/app_logo.png"
+    apkPath  = project.rootDir.absolutePath+"/build/apks/"+"${buildstyle[1]}-v${android_cfg.versionName}-${channel[0]}"+".apk"
+    buildNumber = android_cfg.versionCode
+    changeLog = "渠道标识："+channel[0]
+    startUpload = this.&startUpload
+}
+
+//上传至fir
+def startUpload() {
+    println("开始上传至fir")
+//    def process = "python upToFir.py ${upUrl} ${appName} ${bundleId} ${verName} ${apiToken} ${iconPath} ${apkPath} ${buildNumber} ${changeLog}".execute()
+    def process = "python upToFir.py $upUrl $appName $bundleId $verName $apiToken $iconPath $apkPath $buildNumber $changeLog".execute()
+//    获取Python脚本日志，便于出错调试
+    ByteArrayOutputStream result = new ByteArrayOutputStream()
+    def inputStream = process.getInputStream()
+    byte[] buffer = new byte[1024]
+    int length
+    while ((length = inputStream.read(buffer)) != -1) {
+        result.write(buffer, 0, length)
+    }
+    println(result.toString("UTF-8"))
+    println "上传结束 "
+}
+

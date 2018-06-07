@@ -1,9 +1,13 @@
 apply plugin: 'com.android.application'
+apply from: "package.gradle"
 
 def android_config= rootProject.ext.android
-def dependencie_config = rootProject.ext.dependencies
-def channel = rootProject.ext.channel
-
+def dependencie = rootProject.ext.dependencie
+def librarys = rootProject.ext.librarys
+def startUpload = rootProject.ext.startUpload
+//def keystoreProperties = new Properties()
+//def keystorePropertiesFile = rootProject.file('androidstudy.jks')
+//keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 android {
 
     compileSdkVersion android_config.compileSdkVersion
@@ -20,21 +24,23 @@ android {
 
     //签名
     signingConfigs {
+
         debug {
             storeFile file("./keystore/androidstudy.jks")      //签名文件
             storePassword "zy123456"
             keyAlias "androidstudy"
             keyPassword "zy123456"
             v1SigningEnabled true
-            v2SigningEnabled false
+            v2SigningEnabled true
         }
+
         release {
             storeFile file("./keystore/androidstudy.jks")         //签名文件
             storePassword "zy123456"
             keyAlias "androidstudy"
             keyPassword "zy123456"
             v1SigningEnabled true
-            v2SigningEnabled false
+            v2SigningEnabled true
         }
     }
 
@@ -42,11 +48,11 @@ android {
 
         debug {
             minifyEnabled true
-            minifyEnabled true
             shrinkResources true
             signingConfig signingConfigs.debug
             buildConfigField "String", "BaseUrl", "\"${url["debug"]}\""
         }
+
         release {
             minifyEnabled true
             shrinkResources true
@@ -56,42 +62,23 @@ android {
         }
     }
 
-
-    task debugToFir {
-        dependsOn 'assembleDebug'
-        doLast {
-            def upUrl = "http://api.fir.im/apps"
-            def appName = android_config.appname
-            def bundleId = project.android.defaultConfig.applicationId
-            def verName = project.android.defaultConfig.versionName
-            def apiToken = "e8f8a14e9cfd279e27f6b8f81b50163b"
-            def iconPath = "E:/AndroidStudy/app/src/main/res/mipmap-xxhdpi/ic_launcher.png"
-            def apkPath = "E:/AndroidStudy/app/build/outputs/apk/debug/app-debug.apk"
-            def buildNumber = project.android.defaultConfig.versionCode
-            def changeLog = channel.xiaomi
-            //执行Python脚本
-            def process = "python upToFir.py ${upUrl} ${appName} ${bundleId} ${verName} ${apiToken} ${iconPath} ${apkPath} ${buildNumber} ${changeLog}".execute()
-            println("开始上传至fir")
-            //获取Python脚本日志，便于出错调试
-            ByteArrayOutputStream result = new ByteArrayOutputStream()
-            def inputStream = process.getInputStream()
-            byte[] buffer = new byte[1024]
-            int length
-            while ((length = inputStream.read(buffer)) != -1) {
-                result.write(buffer, 0, length)
-            }
-            println(result.toString("UTF-8"))
-            println "上传结束 "
-        }
-    }
-
 }
 
 dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
-    implementation dependencie_config["appcompat-v7"]
-    implementation dependencie_config["constraint"]
-    testImplementation dependencie_config["junit"]
-    androidTestImplementation dependencie_config["test_runner"]
-    androidTestImplementation dependencie_config["test_espresso"]
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+    dependencie.each { k, v -> compile v }
+    annotationProcessor librarys["butterknife-compiler"]
 }
+
+//开发时，一键打包上传到fir
+//window--> gradlew task toFir
+//发版时，多渠道包
+//window--> gradlew clean apkRelease -Pchannels=@markets.txt
+task toFir {
+    dependsOn 'apkRelease'
+    doLast {
+        startUpload()
+    }
+}
+
+
