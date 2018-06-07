@@ -1,61 +1,89 @@
-## 转载
+## dev_1.1版本的改动概要
 
-## 上传失败
+> 基于master的打包后上传，添加了packer打包、提高推送的送达率、项目的结构调整。
 
-### 文件路径
+### packer打多渠道包、打包上传至fir
 
-检查**iconPath**&**apkPath**是否正确
+ - 首先需要在项目中，接入packer打包的插件，接入的过程参考 [packer-ng-plugin](https://github.com/mcxiaoke/packer-ng-plugin)
+ - 接入成功后，在app内新建packer.gradle文件，并添加以下内容:
+    ```
+	    apply plugin: 'packer'
+		packer {
+		    // 多渠道批量打包脚本处理（mac）   ./gradlew clean apkRelease  打包命令
+		    // 单一渠道批量打包脚本处理(window) gradle clean apkRelease
+		    // 多渠道批量打包脚本处理(window) gradle clean apkRelease -Pchannels=@markets.txt
+		    archiveNameFormat = '${buildType}-v${versionName}-${channel}'
+		    archiveOutput = new File(project.rootProject.buildDir, "apks")
+		    channelList = ['xiaomi','meizu']
+		    channelFile = new File(project.rootDir, "markets.txt")
+		}
 
-### Requests库
+    ```
+ - 在app中build.gradle文件的顶部引入packer.gradle文件。
+    > apply from: "package.gradle"
 
-检查一下requests库是否安装成功，**有些老板**requests库都没有安装成功就开始上传，肯定是不会成功的，如果采用pip安装，需要科学上网，如果不能科学的上网可以下载离线包进行安装，检查request是否安装成功方式如下：
+ - 将之前的app中build.gradle中的task debugToFir任务，提取出来放入根目录中创建upLoad.gradle中，改动后代码如下：
+	```
+	ext {
+	  def channel = rootProject.ext.channel
+      def buildstyle = rootProject.ext.buildstyle
+      def android_cfg = rootProject.ext.android
+      upUrl = "http://api.fir.im/apps"
+	  appName = "androidstduy"
+	  bundleId = android_cfg.applicationId
+	  verName = android_cfg.versionName
+      apiToken = "e8f8a14e9cfd279e27f6b8f81b50163b"
+      iconPath = project.rootDir.absolutePath+"/app/src/main/res/mipmap-xxhdpi/app_logo.png"
+	  apkPath  = project.rootDir.absolutePath+"/build/apks/"+"${buildstyle[1]}-v${android_cfg.versionName}-${channel[0]}"+".apk"
+	  buildNumber = android_cfg.versionCode
+	  changeLog = "渠道标识："+channel[0]
+	  startUpload = this.&startUpload
+	}
 
-- 进入Python环境：在Android Studio的命令行中输入python
+	//上传至fir
+	def startUpload() {
+	  println("开始上传至fir")
+	//    def process = "python upToFir.py ${upUrl} ${appName} ${bundleId} ${verName} ${apiToken} ${iconPath} ${apkPath} ${buildNumber} ${changeLog}".execute()
+	  def process = "python upToFir.py $upUrl $appName $bundleId $verName $apiToken $iconPath $apkPath $buildNumber $changeLog".execute()
+	// 获取Python脚本日志，便于出错调试
+	  ByteArrayOutputStream result = new ByteArrayOutputStream()
+	  def inputStream = process.getInputStream()
+	  byte[] buffer = new byte[1024]
+	  int length
+	  while ((length = inputStream.read(buffer)) != -1) {
+		 result.write(buffer, 0, length)
+	  }
+	  println(result.toString("UTF-8"))
+	  println "上传结束 "
+	}
+	```
 
-  ```python
-  Python 2.7.10 (default, Jul 15 2017, 17:16:57) 
-  [GCC 4.2.1 Compatible Apple LLVM 9.0.0 (clang-900.0.31)] on darwin
-  Type "help", "copyright", "credits" or "license" for more information.
-  >>> 
-  ```
+    > 并将upLoad.gradle文件添加至根目录的build.gradle文件，修改为：
+    ```
+	apply from :'config.gradle'
+	apply from: "upload.gradle"
+      ```
+ - 最后，在app中bulid.gradle文件中创建新的task任务，如下：
+   ```
+	 def startUpload = rootProject.ext.startUpload
+	 task toFir {
+		  //依赖执行 --> gradle apkRelease
+		  dependsOn 'apkRelease'
+		  //doLast 在最后执行，
+		  doLast {
+		      //上传apk文件到Fir
+			  startUpload()
+		  }
+	 }
+   ```
+- 在studio的terminal窗口，执行命令，就可以完成打包-->上传文件到Fir了。
+  > gradle task toFir
 
-- 导入requests,输入import requests
+### 提高推送的送达率
+> 为了提高推送的送达率，建议用户 允许app手机通知、开机自启动、加入白名单等功能。这里提供实现方式，具体操作表现形式，建议参考 **企业微信的消息推送的引导**
+- 实现方式在我的另一篇文章做了详细的介绍：[**Android权限之通知、自启动跳转**](https://github.com/zylaoshi/AndroidTotal/blob/master/Android%E6%9D%83%E9%99%90%E4%B9%8B%E9%80%9A%E7%9F%A5%E3%80%81%E8%87%AA%E5%90%AF%E5%8A%A8%E8%B7%B3%E8%BD%AC.md)
 
-  ```java
-  >>> import requests
-  >>> 
-  ```
+- 代码部分可以在项目中的 [StartUtils](https://github.com/zylaoshi/androidstudy/blob/dev_1.1/app/src/main/java/com/wljr/androidstudy/util/StartUtils.java) 工具类中查看。
 
-  说明安装成功，然后就能够成功上传
-
-  ​
-
-## 编码问题
-
-上传changelog出现中文乱码的问题，主要是由于gradle文件的编码跟Python默认的编码不一致导致，由于gradle文件的编码是默认的是跟随系统，大部分都是UTF-8,而且不便于修改，所以我将参数中的中文字段放在gradle.properties中，所以下面的解决方式就是根据这个来的。
-
-
-
-### Python 2.X
-
-修改.properties编码为ASCII
-
-![python](http://orbm62bsw.bkt.clouddn.com/python.png)
-
-
- ### Python 3.X
-
- 修改.properties编码为UTF-8
-
-![python3](http://orbm62bsw.bkt.clouddn.com/python3.png)
-
-### 注意事项
-修改设置中的.properties文件编码，并不一定能保证改变已经存在的gradle.properties文件编码，所以改完之后查看一下，如果没有成功的话，切换到properties文件，可以点击右下面的文件分隔符切换按钮，如下图，确保编码切换成功，然后在进行上传。
-
-![again](http://orbm62bsw.bkt.clouddn.com/again.png)
-
-## 填坑之路
-
-由于我对Python也不是很熟，所以说来惭愧，我一直自恋地认为自己的代码没有问题，因为我本地的编码是utf-8,
-
-不过他告诉我Python2.X的默认编码是ASCII，Python3.X的默认编码是utf-8，然后我就试着把Python2.X对应的Android Stuido的.propertiers改成了ASCII试了一下，果然成功了。
+### 项目的结构调整
+> 主要将项目app中的build.gradle文件中的一些内容解耦，使之不再臃肿。具体实现详见工程代码。
